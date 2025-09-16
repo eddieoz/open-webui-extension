@@ -76,6 +76,8 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
       ? `${request.url}/openai/chat/completions`
       : `${request.url}/ollama/v1/chat/completions`;
 
+    const isInlineMode = request.inlineMode ?? false;
+
     fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -103,16 +105,16 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
             if (line === 'data: [DONE]') {
               // Send completion message to content script
               chrome.tabs.sendMessage(sender.tab.id, {
-                action: 'streamComplete'
+                action: isInlineMode ? 'streamComplete' : 'contextStreamComplete'
               });
               break;
             } else if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.replace(/^data: /, ''));
                 if (data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content) {
-                  // Send each chunk to content script
+                  // Send each chunk to content script with different action based on mode
                   chrome.tabs.sendMessage(sender.tab.id, {
-                    action: 'streamChunk',
+                    action: isInlineMode ? 'streamChunk' : 'contextStreamChunk',
                     text: data.choices[0].delta.content
                   });
                 }

@@ -134,6 +134,7 @@
           url: url,
           key: key,
           isOpenAI: models.find((m) => m.id === model)?.owned_by === "openai" ?? false,
+          inlineMode: false, // Don't write inline for content-aware queries
           payload: {
             model: model,
             messages: [
@@ -345,9 +346,9 @@
 
     // Listen for streaming messages from background script
     const messageListener = (message) => {
-      if (message.action === 'streamChunk') {
+      if (message.action === 'contextStreamChunk') {
         streamingResponse += message.text;
-      } else if (message.action === 'streamComplete') {
+      } else if (message.action === 'contextStreamComplete') {
         console.log('🏁 Context-aware stream completed');
         isStreaming = false;
       }
@@ -464,6 +465,7 @@
                 url: url,
                 key: key,
                 isOpenAI: models.find((m) => m.id === model)?.owned_by === "openai" ?? false,
+                inlineMode: true, // Write inline for direct completion
                 payload: {
                   model: model,
                   messages: [
