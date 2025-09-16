@@ -71,3 +71,25 @@ export const generateOpenAIChatCompletion = async (
 
   return [res, controller];
 };
+
+export const getPageContent = async () => {
+  try {
+    // Use chrome runtime API to request page content extraction
+    if (typeof chrome === 'undefined' || !chrome.runtime) {
+      throw new Error('Chrome extension API not available');
+    }
+
+    const response = await chrome.runtime.sendMessage({
+      action: "getPageContent"
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error('Error getting page content:', error);
+    throw error;
+  }
+};
