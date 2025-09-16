@@ -283,6 +283,49 @@
     showRetryOptions = false;
   };
 
+  // Simple Markdown to HTML converter for response formatting
+  const markdownToHtml = (markdown) => {
+    if (!markdown) return '';
+
+    let html = markdown
+      // Headers
+      .replace(/^### (.*$)/gim, '<h3 class="tlwd-text-lg tlwd-font-semibold tlwd-text-gray-100 tlwd-mt-4 tlwd-mb-2">$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2 class="tlwd-text-xl tlwd-font-bold tlwd-text-gray-100 tlwd-mt-4 tlwd-mb-2">$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1 class="tlwd-text-2xl tlwd-font-bold tlwd-text-gray-100 tlwd-mt-4 tlwd-mb-2">$1</h1>')
+
+      // Bold and italic
+      .replace(/\*\*\*(.*?)\*\*\*/g, '<strong class="tlwd-font-bold tlwd-text-gray-100"><em class="tlwd-italic">$1</em></strong>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="tlwd-font-bold tlwd-text-gray-100">$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em class="tlwd-italic tlwd-text-gray-200">$1</em>')
+
+      // Code blocks and inline code
+      .replace(/```([^`]+)```/g, '<pre class="tlwd-bg-gray-800 tlwd-rounded tlwd-p-2 tlwd-mt-2 tlwd-mb-2 tlwd-text-xs tlwd-font-mono tlwd-text-gray-300 tlwd-overflow-x-auto"><code>$1</code></pre>')
+      .replace(/`([^`]+)`/g, '<code class="tlwd-bg-gray-800 tlwd-px-1 tlwd-rounded tlwd-text-xs tlwd-font-mono tlwd-text-gray-300">$1</code>')
+
+      // Lists
+      .replace(/^\* (.*$)/gim, '<li class="tlwd-ml-4 tlwd-list-disc tlwd-text-gray-200 tlwd-mb-1">$1</li>')
+      .replace(/^- (.*$)/gim, '<li class="tlwd-ml-4 tlwd-list-disc tlwd-text-gray-200 tlwd-mb-1">$1</li>')
+      .replace(/^\d+\. (.*$)/gim, '<li class="tlwd-ml-4 tlwd-list-decimal tlwd-text-gray-200 tlwd-mb-1">$1</li>')
+
+      // Links
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="tlwd-text-blue-400 hover:tlwd-text-blue-300 tlwd-underline" target="_blank" rel="noopener noreferrer">$1</a>')
+
+      // Line breaks
+      .replace(/\n\n/g, '</p><p class="tlwd-text-gray-200 tlwd-mb-2">')
+      .replace(/\n/g, '<br>');
+
+    // Wrap in paragraph tags if content exists
+    if (html.trim()) {
+      html = '<p class="tlwd-text-gray-200 tlwd-mb-2">' + html + '</p>';
+    }
+
+    // Wrap consecutive list items in ul/ol tags
+    html = html.replace(/(<li[^>]*class="[^"]*list-disc[^"]*"[^>]*>.*?<\/li>)+/g, '<ul class="tlwd-mb-2">$&</ul>');
+    html = html.replace(/(<li[^>]*class="[^"]*list-decimal[^"]*"[^>]*>.*?<\/li>)+/g, '<ol class="tlwd-mb-2">$&</ol>');
+
+    return html;
+  };
+
   // Test function for content extraction and prompt creation
   const testContentExtraction = async () => {
     try {
@@ -972,9 +1015,11 @@ Content: ${pageContent.mainContent || 'No content available'}`;
               </div>
 
               <!-- Response Content -->
-              <div class="tlwd-max-h-96 tlwd-overflow-y-auto tlwd-text-sm tlwd-text-gray-200 tlwd-leading-relaxed tlwd-whitespace-pre-wrap">
+              <div class="tlwd-max-h-96 tlwd-overflow-y-auto tlwd-text-sm tlwd-leading-relaxed">
                 {#if streamingResponse}
-                  {streamingResponse}
+                  <div class="markdown-content">
+                    {@html markdownToHtml(streamingResponse)}
+                  </div>
                 {:else if isStreaming}
                   <div class="tlwd-flex tlwd-items-center tlwd-gap-2 tlwd-text-gray-400">
                     <div class="tlwd-animate-spin tlwd-w-4 tlwd-h-4 tlwd-border-2 tlwd-border-gray-600 tlwd-border-t-blue-500 tlwd-rounded-full"></div>

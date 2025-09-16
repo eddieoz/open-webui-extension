@@ -3,6 +3,9 @@ const appDiv = document.createElement("div");
 appDiv.id = "extension-app";
 document.body.appendChild(appDiv);
 
+// Store accumulated response text for markdown conversion
+let accumulatedResponse = '';
+
 // Function to inject a CSS file
 function injectCSS(file) {
   const link = document.createElement("link");
@@ -42,11 +45,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else {
       // Show in floating box only if we're not on an ad-heavy page
       if (!isAdElement(document.activeElement)) {
-        showFloatingResponse(request.text);
+        // Accumulate text for proper markdown conversion
+        accumulatedResponse += request.text;
+        showFloatingResponse(accumulatedResponse);
       }
     }
   } else if (request.action === 'streamComplete') {
     console.log('🏁 Stream completed');
+    // Reset accumulated response for next stream
+    accumulatedResponse = '';
   }
 });
 
@@ -76,6 +83,49 @@ function isAdElement(element) {
   return false;
 }
 
+// Simple Markdown to HTML converter for floating response box
+function markdownToHtml(markdown) {
+  if (!markdown) return '';
+
+  let html = markdown
+    // Headers
+    .replace(/^### (.*$)/gim, '<h3 style="font-size: 16px !important; font-weight: 600 !important; color: #f3f4f6 !important; margin: 16px 0 8px 0 !important;">$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2 style="font-size: 18px !important; font-weight: 700 !important; color: #f3f4f6 !important; margin: 16px 0 8px 0 !important;">$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1 style="font-size: 20px !important; font-weight: 700 !important; color: #f3f4f6 !important; margin: 16px 0 8px 0 !important;">$1</h1>')
+
+    // Bold and italic
+    .replace(/\*\*\*(.*?)\*\*\*/g, '<strong style="font-weight: 700 !important; color: #f3f4f6 !important;"><em style="font-style: italic !important;">$1</em></strong>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: 700 !important; color: #f3f4f6 !important;">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em style="font-style: italic !important; color: #e5e7eb !important;">$1</em>')
+
+    // Code blocks and inline code
+    .replace(/```([^`]+)```/g, '<pre style="background: #374151 !important; border-radius: 4px !important; padding: 8px !important; margin: 8px 0 !important; font-size: 12px !important; font-family: Consolas, Monaco, monospace !important; color: #d1d5db !important; overflow-x: auto !important;"><code>$1</code></pre>')
+    .replace(/`([^`]+)`/g, '<code style="background: #374151 !important; padding: 2px 4px !important; border-radius: 2px !important; font-size: 12px !important; font-family: Consolas, Monaco, monospace !important; color: #d1d5db !important;">$1</code>')
+
+    // Lists
+    .replace(/^\* (.*$)/gim, '<li style="margin-left: 16px !important; list-style: disc !important; color: #e5e7eb !important; margin-bottom: 4px !important;">$1</li>')
+    .replace(/^- (.*$)/gim, '<li style="margin-left: 16px !important; list-style: disc !important; color: #e5e7eb !important; margin-bottom: 4px !important;">$1</li>')
+    .replace(/^\d+\. (.*$)/gim, '<li style="margin-left: 16px !important; list-style: decimal !important; color: #e5e7eb !important; margin-bottom: 4px !important;">$1</li>')
+
+    // Links
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color: #60a5fa !important; text-decoration: underline !important;" target="_blank" rel="noopener noreferrer">$1</a>')
+
+    // Line breaks
+    .replace(/\n\n/g, '</p><p style="color: #e5e7eb !important; margin-bottom: 8px !important;">')
+    .replace(/\n/g, '<br>');
+
+  // Wrap in paragraph tags if content exists
+  if (html.trim()) {
+    html = '<p style="color: #e5e7eb !important; margin-bottom: 8px !important;">' + html + '</p>';
+  }
+
+  // Wrap consecutive list items in ul/ol tags
+  html = html.replace(/(<li[^>]*list-style: disc[^>]*>.*?<\/li>)+/g, '<ul style="margin-bottom: 8px !important;">$&</ul>');
+  html = html.replace(/(<li[^>]*list-style: decimal[^>]*>.*?<\/li>)+/g, '<ol style="margin-bottom: 8px !important;">$&</ol>');
+
+  return html;
+}
+
 // Improved floating response box
 function showFloatingResponse(text) {
   let responseDiv = document.getElementById('openwebui-response');
@@ -100,7 +150,6 @@ function showFloatingResponse(text) {
       z-index: 999999999 !important;
       overflow-y: auto !important;
       border: 1px solid #444 !important;
-      white-space: pre-wrap !important;
       word-wrap: break-word !important;
     `;
 
@@ -144,7 +193,8 @@ function showFloatingResponse(text) {
 
   const contentArea = responseDiv.querySelector('#openwebui-content');
   if (contentArea) {
-    contentArea.textContent += text;
+    // Convert full accumulated text to HTML and replace content
+    contentArea.innerHTML = markdownToHtml(text);
     responseDiv.scrollTop = responseDiv.scrollHeight;
   }
 }
