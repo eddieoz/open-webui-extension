@@ -1,50 +1,46 @@
 export const getModels = async (key, url) => {
-  let error = null;
+  try {
+    // Use direct chrome API since we're running as content script
+    if (typeof chrome === 'undefined' || !chrome.runtime) {
+      throw new Error('Chrome extension API not available');
+    }
 
-  const res = await fetch(`${url}/api/models`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(key && { authorization: `Bearer ${key}` }),
-    },
-  })
-    .then(async (res) => {
-      if (!res.ok) throw await res.json();
-      return res.json();
-    })
-    .catch((err) => {
-      console.log(err);
-      error = err;
-      return null;
+    const response = await chrome.runtime.sendMessage({
+      action: "fetchModels",
+      key: key,
+      url: url
     });
 
-  if (error) {
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    let models = response.data?.data ?? [];
+
+    models = models
+      .filter((models) => models)
+      .sort((a, b) => {
+        // Compare case-insensitively
+        const lowerA = a.name.toLowerCase();
+        const lowerB = b.name.toLowerCase();
+
+        if (lowerA < lowerB) return -1;
+        if (lowerA > lowerB) return 1;
+
+        // If same case-insensitively, sort by original strings,
+        // lowercase will come before uppercase due to ASCII values
+        if (a < b) return -1;
+        if (a > b) return 1;
+
+        return 0; // They are equal
+      });
+
+    console.log(models);
+    return models;
+  } catch (error) {
+    console.log(error);
     throw error;
   }
-
-  let models = res?.data ?? [];
-
-  models = models
-    .filter((models) => models)
-    .sort((a, b) => {
-      // Compare case-insensitively
-      const lowerA = a.name.toLowerCase();
-      const lowerB = b.name.toLowerCase();
-
-      if (lowerA < lowerB) return -1;
-      if (lowerA > lowerB) return 1;
-
-      // If same case-insensitively, sort by original strings,
-      // lowercase will come before uppercase due to ASCII values
-      if (a < b) return -1;
-      if (a > b) return 1;
-
-      return 0; // They are equal
-    });
-
-  console.log(models);
-  return models;
 };
 
 export const generateOpenAIChatCompletion = async (

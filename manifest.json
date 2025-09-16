@@ -24,7 +24,11 @@
     }
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "http://localhost:*/*",
+    "https://localhost:*/*",
+    "http://127.0.0.1:*/*",
+    "https://127.0.0.1:*/*"
   ],
   "web_accessible_resources": [
     {
@@ -38,6 +42,7 @@
   ],
   "permissions": [
     "storage",
-    "scripting"
+    "scripting",
+    "activeTab"
   ]
 }

@@ -107,6 +107,7 @@
         (e.metaKey || e.ctrlKey) &&
         (e.shiftKey || e.altKey)
       ) {
+        console.log("🔧 Search shortcut triggered");
         e.preventDefault();
         try {
           const response = await chrome.runtime.sendMessage({
@@ -144,19 +145,31 @@
           e.preventDefault();
 
           try {
+            console.log("🔧 Direct completion triggered");
+
             const response = await chrome.runtime.sendMessage({
               action: "getSelection",
             });
 
+            console.log("📝 Selected text:", response?.data);
+
             if (response?.data ?? false) {
+              console.log("✅ Text selected, starting AI completion");
+
               await chrome.runtime.sendMessage({
                 action: "writeText",
                 text: "\n",
               });
 
-              const [res, controller] = await generateOpenAIChatCompletion(
-                key,
-                {
+              console.log("🌐 Using background script for API call");
+
+              // Use background script to avoid ad blocker issues
+              const completionResult = await chrome.runtime.sendMessage({
+                action: "fetchCompletion",
+                url: url,
+                key: key,
+                isOpenAI: models.find((m) => m.id === model)?.owned_by === "openai" ?? false,
+                payload: {
                   model: model,
                   messages: [
                     {
@@ -169,56 +182,35 @@
                     },
                   ],
                   stream: true,
-                },
-
-                models.find((m) => m.id === model)?.owned_by === "openai" ??
-                  false
-                  ? `${url}/openai`
-                  : `${url}/ollama/v1`
-              );
-
-              if (res && res.ok) {
-                const reader = res.body
-                  .pipeThrough(new TextDecoderStream())
-                  .pipeThrough(splitStream("\n"))
-                  .getReader();
-
-                while (true) {
-                  const { value, done } = await reader.read();
-                  if (done) {
-                    break;
-                  }
-
-                  try {
-                    let lines = value.split("\n");
-                    for (const line of lines) {
-                      if (line !== "") {
-                        console.log(line);
-                        if (line === "data: [DONE]") {
-                          console.log("DONE");
-                        } else {
-                          let data = JSON.parse(line.replace(/^data: /, ""));
-                          console.log(data);
-
-                          if ("request_id" in data) {
-                            console.log(data.request_id);
-                          } else {
-                            await chrome.runtime.sendMessage({
-                              action: "writeText",
-                              text: data.choices[0].delta.content ?? "",
-                            });
-                          }
-                        }
-                      }
-                    }
-                  } catch (error) {
-                    console.log(error);
-                  }
                 }
+              });
+
+              if (completionResult.success) {
+                console.log("🚀 Background streaming started");
+              } else {
+                console.error("❌ Background request failed:", completionResult.error);
+                await chrome.runtime.sendMessage({
+                  action: "writeText",
+                  text: `Error: ${completionResult.error}`,
+                });
               }
+            } else {
+              console.log("⚠️ No text selected");
+              await chrome.runtime.sendMessage({
+                action: "writeText",
+                text: "No text selected. Please select text first.",
+              });
             }
           } catch (error) {
-            console.log(error);
+            console.error("💥 Completion error:", error);
+            try {
+              await chrome.runtime.sendMessage({
+                action: "writeText",
+                text: `Error: ${error.message}`,
+              });
+            } catch (e) {
+              console.error("Failed to send error message:", e);
+            }
           }
         }
       }
