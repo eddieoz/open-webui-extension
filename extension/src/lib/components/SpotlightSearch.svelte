@@ -68,12 +68,16 @@
       return;
     }
 
-    // If context is disabled, use the existing behavior (open new tab)
+    // If context is disabled, use the existing behavior (open new tab with web search enabled)
     if (!includePageContext) {
-      window.open(
-        `${url}/?q=${encodeURIComponent(searchValue)}&models=${model}`,
-        "_blank"
-      );
+      const openWebUIURL = `${url}/?q=${encodeURIComponent(searchValue)}&models=${model}&web-search=true`;
+      console.log("🔗 Opening Open WebUI in new tab with web search enabled:", {
+        url: url,
+        searchValue: searchValue,
+        model: model,
+        fullURL: openWebUIURL
+      });
+      window.open(openWebUIURL, "_blank");
       searchValue = "";
       show = false;
       return;
@@ -266,9 +270,9 @@
   };
 
   const fallbackToSearch = () => {
-    console.log("🔄 Falling back to normal search...");
+    console.log("🔄 Falling back to normal search with web search enabled...");
     window.open(
-      `${url}/?q=${encodeURIComponent(searchValue)}&models=${model}`,
+      `${url}/?q=${encodeURIComponent(searchValue)}&models=${model}&web-search=true`,
       "_blank"
     );
     searchValue = "";
