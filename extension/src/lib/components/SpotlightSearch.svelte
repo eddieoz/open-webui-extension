@@ -496,11 +496,77 @@
                 });
               }
             } else {
-              console.log("⚠️ No text selected");
-              await chrome.runtime.sendMessage({
-                action: "writeText",
-                text: "No text selected. Please select text first.",
-              });
+              console.log("⚠️ No text selected, extracting page content for summarization");
+
+              try {
+                // Extract page content for summarization
+                const pageContentResult = await chrome.runtime.sendMessage({
+                  action: "getPageContent",
+                });
+
+                if (pageContentResult.success && pageContentResult.data) {
+                  const pageContent = pageContentResult.data;
+                  console.log("📄 Page content extracted for summarization");
+
+                  await chrome.runtime.sendMessage({
+                    action: "writeText",
+                    text: "\n",
+                  });
+
+                  // Create summarization prompt
+                  const summaryPrompt = `Task: Summarize the following article. Length: 3-5 sentences. Format: Markdown. Requirements: capture the main ideas and key points; easy to understand; summary should be free from ambiguity.
+
+Page Title: ${pageContent.title || 'Untitled'}
+URL: ${pageContent.url}
+${pageContent.metaDescription ? `Description: ${pageContent.metaDescription}\n` : ''}
+Content: ${pageContent.mainContent || 'No content available'}`;
+
+                  // Use background script for API call
+                  const completionResult = await chrome.runtime.sendMessage({
+                    action: "fetchCompletion",
+                    url: url,
+                    key: key,
+                    isOpenAI: models.find((m) => m.id === model)?.owned_by === "openai" ?? false,
+                    inlineMode: true, // Write inline for page summarization
+                    payload: {
+                      model: model,
+                      messages: [
+                        {
+                          role: "system",
+                          content: "You are a helpful assistant that provides clear and concise summaries of web pages.",
+                        },
+                        {
+                          role: "user",
+                          content: summaryPrompt,
+                        },
+                      ],
+                      stream: true,
+                    }
+                  });
+
+                  if (completionResult.success) {
+                    console.log("🚀 Page summarization started");
+                  } else {
+                    console.error("❌ Page summarization failed:", completionResult.error);
+                    await chrome.runtime.sendMessage({
+                      action: "writeText",
+                      text: `Error: ${completionResult.error}`,
+                    });
+                  }
+                } else {
+                  console.error("❌ Failed to extract page content:", pageContentResult.error);
+                  await chrome.runtime.sendMessage({
+                    action: "writeText",
+                    text: `Error extracting page content: ${pageContentResult.error || 'Unknown error'}`,
+                  });
+                }
+              } catch (contentError) {
+                console.error("💥 Page content extraction error:", contentError);
+                await chrome.runtime.sendMessage({
+                  action: "writeText",
+                  text: `Error extracting page content: ${contentError.message}`,
+                });
+              }
             }
           } catch (error) {
             console.error("💥 Completion error:", error);
