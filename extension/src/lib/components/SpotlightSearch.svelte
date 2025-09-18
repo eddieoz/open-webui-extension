@@ -551,32 +551,32 @@
                   const pageContent = pageContentResult.data;
                   console.log("📄 Page content extracted for summarization");
 
-                  await chrome.runtime.sendMessage({
-                    action: "writeText",
-                    text: "\n",
-                  });
-
                   // Create summarization prompt
-                  const summaryPrompt = `Task: Summarize the following article. Length: 3-5 sentences. Format: Markdown. Requirements: capture the main ideas and key points; easy to understand; summary should be free from ambiguity.
-
-Page Title: ${pageContent.title || 'Untitled'}
+                  const summaryPrompt = `Page Title: ${pageContent.title || 'Untitled'}
 URL: ${pageContent.url}
 ${pageContent.metaDescription ? `Description: ${pageContent.metaDescription}\n` : ''}
 Content: ${pageContent.mainContent || 'No content available'}`;
 
-                  // Use background script for API call
+                  // Open spotlight popup and show response there
+                  show = true;
+                  showResponse = true;
+                  streamingResponse = "";
+                  isStreaming = true;
+                  searchValue = "Summarizing page content...";
+
+                  // Use background script for API call - show in popup instead of inline
                   const completionResult = await chrome.runtime.sendMessage({
                     action: "fetchCompletion",
                     url: url,
                     key: key,
                     isOpenAI: models.find((m) => m.id === model)?.owned_by === "openai" ?? false,
-                    inlineMode: true, // Write inline for page summarization
+                    inlineMode: false, // Show in popup for page summarization
                     payload: {
                       model: model,
                       messages: [
                         {
                           role: "system",
-                          content: "You are a helpful assistant that provides clear and concise summaries of web pages.",
+                          content: "Task: Summarize the following article. Length: 5-7 sentences. Format: Markdown. Requirements: capture the main ideas and key points; easy to understand; summary should be free from ambiguity.",
                         },
                         {
                           role: "user",
@@ -591,36 +591,30 @@ Content: ${pageContent.mainContent || 'No content available'}`;
                     console.log("🚀 Page summarization started");
                   } else {
                     console.error("❌ Page summarization failed:", completionResult.error);
-                    await chrome.runtime.sendMessage({
-                      action: "writeText",
-                      text: `Error: ${completionResult.error}`,
-                    });
+                    streamingResponse = `Error: ${completionResult.error}`;
+                    isStreaming = false;
                   }
                 } else {
                   console.error("❌ Failed to extract page content:", pageContentResult.error);
-                  await chrome.runtime.sendMessage({
-                    action: "writeText",
-                    text: `Error extracting page content: ${pageContentResult.error || 'Unknown error'}`,
-                  });
+                  show = true;
+                  showResponse = true;
+                  streamingResponse = `Error extracting page content: ${pageContentResult.error || 'Unknown error'}`;
+                  isStreaming = false;
                 }
               } catch (contentError) {
                 console.error("💥 Page content extraction error:", contentError);
-                await chrome.runtime.sendMessage({
-                  action: "writeText",
-                  text: `Error extracting page content: ${contentError.message}`,
-                });
+                show = true;
+                showResponse = true;
+                streamingResponse = `Error extracting page content: ${contentError.message}`;
+                isStreaming = false;
               }
             }
           } catch (error) {
             console.error("💥 Completion error:", error);
-            try {
-              await chrome.runtime.sendMessage({
-                action: "writeText",
-                text: `Error: ${error.message}`,
-              });
-            } catch (e) {
-              console.error("Failed to send error message:", e);
-            }
+            show = true;
+            showResponse = true;
+            streamingResponse = `Error: ${error.message}`;
+            isStreaming = false;
           }
         }
       }
